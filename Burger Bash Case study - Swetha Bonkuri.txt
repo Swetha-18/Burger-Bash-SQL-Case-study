@@ -1,0 +1,263 @@
+﻿Burger Bash Case study
+
+
+
+
+
+
+-- Table creation for customer orders
+CREATE TABLE customer_orders (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    burger_id INT,
+    exclusions VARCHAR(255),
+    extras VARCHAR(255),
+    order_time TIMESTAMP
+);
+
+
+-- Table creation for burger names
+CREATE TABLE burger_names (
+    burger_id INT PRIMARY KEY,
+    burger_name VARCHAR(255)
+);
+
+
+-- Insert data into burger_names table
+INSERT INTO burger_names (burger_id, burger_name)
+VALUES
+    (1, 'Meatlovers'),
+    (2, 'Vegetarian');
+
+
+-- List all tables in the current database
+SELECT TABLE_NAME
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_TYPE = 'BASE TABLE';
+
+
+-- Table creation for burger runners
+CREATE TABLE burger_runner (
+    runner_id INT PRIMARY KEY,
+    registration_date DATE
+);
+
+
+-- Insert data into burger_runner table
+INSERT INTO burger_runner VALUES 
+    (1, '2021-01-01'), 
+    (2, '2021-01-03'), 
+    (3, '2021-01-08'), 
+    (4, '2021-01-15');
+
+
+-- Table creation for runner orders
+CREATE TABLE runner_orders (
+    order_id INT PRIMARY KEY,
+    runner_id INT,
+    pickup_time TIMESTAMP,
+    distance VARCHAR(50),
+    duration VARCHAR(50),
+    cancellation VARCHAR(50)
+);
+
+
+-- Table creation for burger runner orders
+CREATE TABLE burger_runner_orders (
+    order_id INT PRIMARY KEY,
+    runner_id INT,
+    pickup_time TIMESTAMP,
+    distance VARCHAR(255),
+    duration VARCHAR(255),
+    cancellation VARCHAR(255)
+);
+
+
+-- Step 1: Create a new table
+CREATE TABLE burger_runner_orders_new (
+    order_id INT PRIMARY KEY,
+    runner_id INT,
+    pickup_time DATETIME,
+    distance VARCHAR(255),
+    duration VARCHAR(255),
+    cancellation VARCHAR(255)
+);
+
+
+-- Step 2: Insert data into the new table
+INSERT INTO burger_runner_orders_new (order_id, runner_id, pickup_time, distance, duration, cancellation)
+VALUES
+(1, 1, '2021-01-01 18:15:00', '20km', '32 minutes', NULL),
+(2, 1, '2021-01-01 19:10:00', '20km', '27 minutes', NULL),
+(3, 1, '2021-03-01 00:12:00', '13.4km', '20 mins', NULL),
+(4, 2, '2021-04-01 13:53:00', '23.4km', '40 minutes', NULL),
+(5, 3, '2021-08-01 21:10:00', '10km', '15 minutes', 'Restaurant Cancellation'),
+(6, 3, NULL, NULL, NULL, 'Restaurant Cancellation'),
+(7, 2, '2021-08-01 21:30:00', '25km', '25 minutes', NULL),
+(8, 2, '2021-10-01 00:15:00', '23.4km', '15 minutes', NULL),
+(9, 2, NULL, NULL, NULL, 'Customer Cancellation'),
+(10, 1, '2021-11-01 18:50:00', '10km', '10 minutes', NULL);
+
+
+
+
+-- Step 3: Rename the tables
+EXEC sp_rename 'burger_runner_orders', 'burger_runner_orders_old';
+EXEC sp_rename 'burger_runner_orders_new', 'burger_runner_orders';
+
+
+-- Step 1: Create a new table
+CREATE TABLE runner_orders_new (
+    order_id INT PRIMARY KEY,
+    runner_id INT,
+    pickup_time DATETIME,
+    distance VARCHAR(255),
+    duration VARCHAR(255),
+    cancellation VARCHAR(255)
+);
+
+
+
+
+-- Step 2: Insert data into the new table
+INSERT INTO runner_orders_new (order_id, runner_id, pickup_time, distance, duration, cancellation)
+VALUES
+(1, 1, '2021-01-01 18:15:00', '20km', '32 minutes', NULL),
+(2, 1, '2021-01-01 19:10:00', '20km', '27 minutes', NULL),
+(3, 1, '2021-03-01 00:12:00', '13.4km', '20 mins', NULL),
+(4, 2, '2021-04-01 13:53:00', '23.4km', '40 minutes', NULL),
+(5, 3, '2021-08-01 21:10:00', '10km', '15 minutes', 'Restaurant Cancellation'),
+(6, 3, NULL, NULL, NULL, 'Restaurant Cancellation'),
+(7, 2, '2021-08-01 21:30:00', '25km', '25 minutes', NULL),
+(8, 2, '2021-10-01 00:15:00', '23.4km', '15 minutes', NULL),
+(9, 2, NULL, NULL, NULL, 'Customer Cancellation'),
+(10, 1, '2021-11-01 18:50:00', '10km', '10 minutes', NULL);
+
+
+
+
+-- Step 3: Rename the existing table
+EXEC sp_rename 'runner_orders', 'runner_orders_old';
+
+
+
+
+-- Step 4: Rename the new table to replace the old one
+EXEC sp_rename 'runner_orders_new', 'runner_orders';
+
+
+
+
+-- Step 5: Verify the new table
+SELECT * FROM runner_orders;
+
+
+
+
+-- Queries for analysis and reporting
+
+
+-- 1. How many successful orders were delivered by each runner?
+SELECT runner_id, COUNT(order_id) AS successful_orders
+FROM runner_orders
+WHERE cancellation IS NULL
+GROUP BY runner_id;
+ answer:
+1        4
+2        3
+
+
+-- 2. What was the maximum number of burgers delivered in a single order?
+SELECT MAX(burger_count) AS max_burgers_delivered
+FROM (SELECT order_id, COUNT(*) AS burger_count
+      FROM runner_orders
+      GROUP BY order_id) AS order_counts;
+
+
+ans: 1
+
+
+-- 3. For each customer, how many delivered burgers had at least 1 change and how many had no changes?
+SELECT o.runner_id,
+       SUM(CASE WHEN o.cancellation IS NOT NULL THEN 1 ELSE 0 END) AS changed_orders,
+       SUM(CASE WHEN o.cancellation IS NULL THEN 1 ELSE 0 END) AS unchanged_orders
+FROM runner_orders o
+JOIN burger_names r ON o.runner_id = r.burger_id
+GROUP BY o.runner_id;
+ ans:
+1        0        4
+2        1        3
+
+
+-- 4. How many of each type of burger was delivered?
+SELECT b.burger_id, b.burger_name, COUNT(o.order_id) AS burgers_delivered
+FROM burger_names b
+LEFT JOIN runner_orders o ON b.burger_id = o.runner_id
+GROUP BY b.burger_id, b.burger_name;
+Answer: 
+1        Meatlovers        4
+2        Vegetarian        4
+
+
+-- 5. How many Vegetarian and Meatlovers were ordered by each customer?
+SELECT r.runner_id, 
+       SUM(CASE WHEN b.burger_name = 'Vegetarian' THEN 1 ELSE 0 END) AS vegetarian_count,
+       SUM(CASE WHEN b.burger_name = 'Meatlovers' THEN 1 ELSE 0 END) AS meatlovers_count
+FROM burger_names b
+JOIN runner_orders r ON b.burger_id = r.runner_id
+GROUP BY r.runner_id;
+Answer:
+1        0        4
+2        4        0
+
+
+-- 6. What was the maximum number of burgers delivered in a single order?
+SELECT MAX(burger_count) AS max_burgers_delivered
+FROM (SELECT order_id, COUNT(*) AS burger_count
+      FROM runner_orders
+      GROUP BY order_id) AS order_counts;
+answer:
+1
+
+
+-- 7. For each customer, how many delivered burgers had at least 1 change and how many had no changes?
+SELECT o.runner_id,
+       SUM(CASE WHEN o.cancellation IS NOT NULL THEN 1 ELSE 0 END) AS changed_orders,
+       SUM(CASE WHEN o.cancellation IS NULL THEN 1 ELSE 0 END) AS unchanged_orders
+FROM runner_orders o
+JOIN burger_names r ON o.runner_id = r.burger_id
+GROUP BY o.runner_id;
+answer:
+1        0        4
+2        1        3
+
+
+-- 8. What was the total volume of burgers ordered for each hour of the day?
+SELECT DATEPART(HOUR, pickup_time) AS hour_of_day,
+       COUNT(*) AS total_burgers_ordered
+FROM runner_orders
+GROUP BY DATEPART(HOUR, pickup_time);
+answer:NULL        2
+0        2
+13        1
+18        2
+19        1
+21        2
+
+
+-- 9. How many runners signed up for each 1-week period?
+SELECT DATEPART(WEEK, registration_date) AS week_number,
+       COUNT(runner_id) AS runners_signed_up
+FROM burger_runner
+GROUP BY DATEPART(WEEK, registration_date);
+answer: 
+1        1
+2        2
+3        1
+
+
+-- 10. What was the average distance traveled for each customer?
+SELECT runner_id, AVG(CAST(distance AS DECIMAL(10,2))) AS avg_distance_traveled
+FROM runner_orders
+WHERE ISNUMERIC(distance) = 1  -- Add this condition to filter out non-numeric values
+GROUP BY runner_id;
